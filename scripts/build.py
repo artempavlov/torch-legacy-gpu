@@ -11,6 +11,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 
@@ -61,6 +62,26 @@ def manylinux_platform():
     return "manylinux_" + "_".join(parts[:2]) + "_" + platform.machine()
 
 
+def prepare_audio_wheel(wheel, scratch):
+    # Upstream CMake removes the install RPATH. Its sibling DSOs then look
+    # external to auditwheel, even though they are already inside this wheel.
+    unpacked = scratch / "unpacked"
+    packed = scratch / "packed"
+    unpacked.mkdir(parents=True)
+    packed.mkdir()
+    run(sys.executable, "-m", "wheel", "unpack", "--dest", unpacked, wheel)
+    package = next(unpacked.iterdir())
+    for path in package.rglob("*"):
+        if path.is_file():
+            with path.open("rb") as stream:
+                is_elf = stream.read(4) == b"\x7fELF"
+            if is_elf:
+                run("patchelf", "--add-rpath", "$ORIGIN", path)
+    # Rebuild RECORD after changing the ELF files; do not edit a zip in place.
+    run(sys.executable, "-m", "wheel", "pack", "--dest-dir", packed, package)
+    return next(packed.glob("*.whl"))
+
+
 def repair(wheel, out, cuda):
     if sys.platform == "win32":
         # Don't vendor NVIDIA's driver: it belongs to the user's system.
@@ -77,7 +98,13 @@ def repair(wheel, out, cuda):
             # These are supplied by the matching torch wheel, not by Linux.
             for library in ("libtorch.so", "libtorch_cpu.so", "libtorch_cuda.so", "libtorch_python.so", "libc10.so", "libc10_cuda.so"):
                 exclude.extend(["--exclude", library])
-        run(sys.executable, "-m", "auditwheel", "repair", "--plat", manylinux_platform(), *exclude, "--wheel-dir", out, wheel)
+        command = [sys.executable, "-m", "auditwheel", "repair", "--plat", manylinux_platform()] + exclude + ["--wheel-dir", out]
+        if wheel.name.startswith("torchaudio-"):
+            with tempfile.TemporaryDirectory(dir=str(out)) as scratch:
+                prepared = prepare_audio_wheel(wheel, Path(scratch))
+                run(*command, prepared)
+        else:
+            run(*command, wheel)
 
 
 def create_smoke_environment(directory):

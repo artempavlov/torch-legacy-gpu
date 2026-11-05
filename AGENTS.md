@@ -30,3 +30,7 @@ Install pip's patchelf>=0.14.5 alongside auditwheel; Ubuntu 18.04's system
 patchelf 0.9 and Ubuntu 22.04's 0.14.3 are too old for current auditwheel.
 Upgrade pip inside the fresh smoke-test venv before installing repaired wheels.
 Python 3.6 seeds pip 18.1; PEP 600 manylinux tags require pip 20.3 or later.
+Before Linux torchaudio repair, unpack the wheel, add $ORIGIN to each bundled
+ELF's RPATH, then repack with wheel to regenerate RECORD. Upstream CMake strips
+the install RPATH; without this, auditwheel cannot resolve sibling libraries
+such as libtorchaudio.so. Never exclude these bundled libraries from repair.

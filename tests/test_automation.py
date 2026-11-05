@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -157,6 +158,39 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_linux_audio_repair_audits_the_prepared_wheel_without_excluding_its_libraries(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            root = Path(directory)
+            prepared = root / "prepared.whl"
+            with patch("build.sys.platform", "linux"), patch("build.prepare_audio_wheel", return_value=prepared) as prepare, patch("build.run") as run:
+                build.repair(Path("torchaudio-1.0.whl"), root, Path("cuda"))
+            prepare.assert_called_once()
+            self.assertEqual(run.call_args.args[-1], prepared)
+            self.assertNotIn("libtorchaudio.so", run.call_args.args)
+
+    def test_audio_repair_adds_origin_to_bundled_elf_libraries_before_auditwheel(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            root = Path(directory)
+            wheel = root / "torchaudio-1.0-py3-none-linux_x86_64.whl"
+            with zipfile.ZipFile(wheel, "w") as archive:
+                archive.writestr("torchaudio/lib/libtorchaudio.so", b"\x7fELFtest")
+                archive.writestr("torchaudio/lib/_torchaudio.so", b"\x7fELFtest")
+                archive.writestr("torchaudio/__init__.py", b"pass")
+            def commands(*args, **kwargs):
+                if args[2:4] == ("wheel", "unpack"):
+                    with zipfile.ZipFile(str(args[-1])) as archive:
+                        archive.extractall(str(Path(args[5]) / "torchaudio-1.0"))
+                elif args[2:4] == ("wheel", "pack"):
+                    (Path(args[5]) / wheel.name).touch()
+            with patch("build.run", side_effect=commands) as run:
+                build.prepare_audio_wheel(wheel, root / "scratch")
+            patches = [c.args for c in run.call_args_list if c.args[0] == "patchelf"]
+            self.assertEqual(len(patches), 2)
+            self.assertTrue(all(c[1:3] == ("--add-rpath", "$ORIGIN") for c in patches))
+            self.assertIn("pack", run.call_args_list[-1].args)
+
     def test_fresh_smoke_environment_upgrades_pip_before_wheel_installation(self):
         with patch("build.sys.platform", "linux"), patch("build.run") as run:
             python = build.create_smoke_environment(Path("smoke-env"))
