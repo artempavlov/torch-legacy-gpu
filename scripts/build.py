@@ -23,8 +23,10 @@ def pip(*args, **kwargs):
 
 
 def checkout(repository, version, destination):
-    run("git", "clone", "--depth", "1", "--branch", "v" + version, "https://github.com/pytorch/" + repository + ".git", destination)
-    run("git", "submodule", "update", "--init", "--recursive", "--depth", "1", cwd=str(destination))
+    # -c is inherited by recursive Git processes, unlike a parent repo's local
+    # config. FlashAttention's nested paths exceed Windows' default 260 chars.
+    run("git", "-c", "core.longpaths=true", "clone", "--depth", "1", "--branch", "v" + version, "https://github.com/pytorch/" + repository + ".git", destination)
+    run("git", "-c", "core.longpaths=true", "submodule", "update", "--init", "--recursive", "--depth", "1", cwd=str(destination))
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(destination)).decode().strip()
 
 
@@ -75,6 +77,8 @@ def main():
     cuda = Path(os.environ.get("CUDA_PATH", "/usr/local/cuda"))
     env = os.environ.copy()
     env.update({"CUDA_HOME": str(cuda), "CUDA_PATH": str(cuda),
+                # Also applies to pip's isolated PEP 517 build environment.
+                "PIP_PREFER_BINARY": "1",
                 "TORCH_CUDA_ARCH_LIST": ";".join(spec["architectures"]),
                 "MAX_JOBS": "2", "CMAKE_BUILD_PARALLEL_LEVEL": "2", "CMAKE_GENERATOR": "Ninja",
                 "USE_CUDA": "1", "FORCE_CUDA": "1", "BUILD_TEST": "0",
@@ -96,9 +100,13 @@ def main():
             env["CMAKE_CUDA_COMPILER_LAUNCHER"] = "ccache"
     pyminor = sys.version_info.minor
     if pyminor <= 8:
-        pip("install", "setuptools<60", "wheel<0.38", "cmake<3.20", "ninja", "numpy<1.20", "pyyaml<6", "typing_extensions", "cffi", "future", "six", "requests", "pillow<10")
+        pip("install", "--prefer-binary", "setuptools<60", "wheel<0.38", "cmake<3.20", "ninja", "numpy<1.20", "pyyaml<6", "typing_extensions", "cffi", "future", "six", "requests", "pillow<10")
     else:
-        pip("install", "setuptools<82", "wheel", "cmake>=3.27,<4", "ninja", "numpy<3", "pyyaml", "typing_extensions", "packaging", "six", "requests", "cffi", "pillow", "filelock", "sympy", "networkx", "jinja2", "fsspec", "psutil")
+        # Newest sdists can drop an experimental ABI before older wheels do.
+        # CFFI is only needed by the 1.6 lane and rejects CPython 3.13t entirely.
+        # 2.7's requirements.txt explicitly caps setuptools on Windows.
+        setuptools = "setuptools<=75.8.2" if spec["name"] == "kepler" else "setuptools<82"
+        pip("install", "--prefer-binary", setuptools, "wheel", "cmake>=3.27,<4", "ninja", "numpy<3", "pyyaml", "typing_extensions", "packaging", "six", "requests", "pillow", "filelock", "sympy", "networkx", "jinja2", "fsspec", "psutil", "astunparse", "optree>=0.13.0")
     pip("install", "delvewheel" if sys.platform == "win32" else "auditwheel")
     sources = {}
     wheels = []
@@ -144,13 +152,13 @@ def main():
     # Resolve runtime dependencies without letting pip replace the local torch.
     constraints = work / "constraints.txt"
     constraints.write_text("torch==" + torch_version + "\n")
-    pip("install", "--constraint", constraints, *wheels)
+    pip("install", "--prefer-binary", "--constraint", constraints, *wheels)
     # Verify in a fresh environment, without the toolkit on the loader path.
     # Otherwise a broken wheel could pass by finding unbundled build libraries.
     fresh = work / "smoke-env"
     run(sys.executable, "-m", "venv", fresh)
     fresh_python = fresh / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
-    run(fresh_python, "-m", "pip", "install", "--constraint", constraints, *wheels)
+    run(fresh_python, "-m", "pip", "install", "--prefer-binary", "--constraint", constraints, *wheels)
     clean = env.copy()
     clean.pop("LD_LIBRARY_PATH", None)
     clean.pop("PYTHONPATH", None)

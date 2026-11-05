@@ -4,7 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends build-essential git curl ca-certificates \
-  patchelf libopenblas-dev libjpeg-dev libpng-dev libwebp-dev ccache pkg-config libsox-dev
+  patchelf libopenblas-dev libjpeg-dev libpng-dev libwebp-dev ccache pkg-config libsox-dev libxml2
 git config --global --add safe.directory /workspace
 mkdir -p /workspace/.tmp
 export TMPDIR=/workspace/.tmp

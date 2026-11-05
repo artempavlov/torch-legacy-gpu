@@ -2,6 +2,7 @@ import ast
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -11,6 +12,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from build import patch_sm30
+import build
 from plan import compatible_domain, matrix_rows, python_versions, release_tag, stable_releases
 from publish import finalize, publish_bundle, validate_bundle
 
@@ -155,6 +157,37 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_checkout_enables_long_paths_for_clone_and_recursive_submodules(self):
+        with patch("build.run") as run, patch("build.subprocess.check_output", return_value=b"sha\n"):
+            build.checkout("pytorch", "2.7.1", Path("source"))
+        for call in run.call_args_list:
+            self.assertEqual(call.args[:3], ("git", "-c", "core.longpaths=true"))
+
+    def bootstrap_command(self, minor):
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            root = Path(directory)
+            spec = root / "spec.json"
+            spec.write_text(json.dumps({"name": "kepler", "architectures": ["3.5", "3.7"],
+                                        "torch": "2.7.1", "vision": "0.22.1", "audio": "2.7.1", "local": "test"}))
+            with patch("build.Path.cwd", return_value=root), patch("build.sys.argv", ["build.py", "--spec", str(spec), "--output", str(root / "dist")]), patch("build.sys.version_info", Mock(minor=minor)), patch("build.pip") as pip, patch("build.checkout", side_effect=RuntimeError("stop before compilation")), patch.dict(os.environ):
+                with self.assertRaisesRegex(RuntimeError, "stop before compilation"):
+                    build.main()
+            return pip.call_args_list[0].args
+
+    def test_modern_bootstrap_does_not_require_cffi_on_python313t(self):
+        self.assertNotIn("cffi", self.bootstrap_command(13))
+
+    def test_bootstrap_prefers_compatible_wheels_over_newer_sdists(self):
+        self.assertIn("--prefer-binary", self.bootstrap_command(13))
+
+    def test_kepler_setuptools_respects_upstream_windows_limit(self):
+        self.assertIn("setuptools<=75.8.2", self.bootstrap_command(13))
+
+    def test_cuda102_installer_has_libxml2_before_it_runs(self):
+        script = (ROOT / "scripts/linux.sh").read_text()
+        apt = script.split("apt-get install", 1)[1].split("git config", 1)[0]
+        self.assertIn("libxml2", apt.split())
+
     def test_build_scripts_parse_on_python36(self):
         for name in ("build.py", "smoke.py"):
             ast.parse((ROOT / "scripts" / name).read_text(), feature_version=(3, 6))

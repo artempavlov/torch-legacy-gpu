@@ -16,3 +16,9 @@ Use `.tmp/` for temporary files. Do not vendor upstream workflows. Do not claim
 hardware support from successful compilation alone. Never publish an incomplete
 bundle, silently downgrade a source version, or replace an official NVIDIA driver.
 Changes to wheel contents/configuration require a revision bump after publication.
+
+Bootstrap regressions: keep `core.longpaths=true` on both source clone and
+recursive submodule commands (Windows FlashAttention paths); install `libxml2`
+before running the CUDA 10.2 installer. Prefer compatible binary dependencies,
+do not install CFFI for modern torch (it rejects Python 3.13t), and respect
+PyTorch 2.7's `setuptools<=75.8.2` limit.
