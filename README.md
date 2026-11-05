@@ -82,8 +82,11 @@ or leave jobs queued for unavailable runners.
 The small local workflow instead checks out official release tags recursively
 and invokes **their own build backends**: `pip wheel` for modern PEP 517 PyTorch,
 or the original `setup.py bdist_wheel` for older versions and companion libraries.
-The only source edit is a checked, one-line sm_30 extension allowlist addition in
-PyTorch 1.6.0. CUDA API/compiler checks and kernels are not patched away.
+PyTorch 1.6.0 gets a checked, one-line sm_30 extension allowlist addition.
+On Windows it also gets the SDK compatibility define from upstream
+[409efeb](https://github.com/pytorch/pytorch/commit/409efebab8718a7bfc714ab3787e5a8689289697)
+to fix the newer SDK's `INFINITY` macro with old NVCC. Both edits are recorded
+in the bundle manifest. CUDA API/compiler checks and kernels are not patched away.
 
 For legacy coverage and hosted-runner resource limits these are **reduced-feature
 builds**, not replacements for every feature of official PyTorch wheels.

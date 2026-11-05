@@ -43,6 +43,17 @@ def patch_sm30(source):
     path.write_text(text.replace(old, "supported_arches = ['3.0', '3.5'"))
 
 
+def patch_windows_sdk(source):
+    # Backport upstream 409efebab8718a7bfc714ab3787e5a8689289697 (#85408).
+    # SDK >=25131 changed INFINITY in a way old NVCC cannot parse (#83820).
+    path = source / "cmake/Dependencies.cmake"
+    text = path.read_text()
+    old = "if(MSVC)\n  foreach(flag_var "
+    if text.count(old) != 1:
+        raise RuntimeError("Windows SDK compatibility patch no longer applies cleanly")
+    path.write_text(text.replace(old, "if(MSVC)\n  add_definitions(-D_UCRT_LEGACY_INFINITY)\n  foreach(flag_var "))
+
+
 def metadata(path):
     with zipfile.ZipFile(str(path)) as archive:
         name = next(n for n in archive.namelist() if n.endswith(".dist-info/METADATA"))
@@ -180,6 +191,8 @@ def main():
         sources[repository] = checkout(repository, version, source)
         if package == "torch" and spec["name"] == "kepler30":
             patch_sm30(source)
+            if sys.platform == "win32":
+                patch_windows_sdk(source)
         env["BUILD_VERSION"] = version + "+" + spec["local"]
         raw = work / (package + "-wheels")
         raw.mkdir(exist_ok=True)
@@ -224,7 +237,7 @@ def main():
     manifest = dict(spec, sources=sources, verification=json.loads((out / "smoke.json").read_text()),
                     wheels=[{"name": w.name, "sha256": hashlib.sha256(w.read_bytes()).hexdigest(), "size": w.stat().st_size} for w in wheels],
                     disabled_features=["cuDNN", "distributed/NCCL", "FlashAttention", "memory-efficient attention", "cuSPARSELt", "cuFile", "Kineto", "MKLDNN", "NNPACK", "FFmpeg", "SoX", "Kaldi", "NVJPEG"],
-                    source_patch="cpp_extension sm_30 allowlist" if spec["name"] == "kepler30" else None)
+                     source_patch=("cpp_extension sm_30 allowlist" + ("; upstream 409efeb Windows SDK compatibility" if sys.platform == "win32" else "")) if spec["name"] == "kepler30" else None)
     (out / "smoke.json").unlink()
     (out / (spec["id"] + ".json")).write_text(json.dumps(manifest, indent=2) + "\n")
 

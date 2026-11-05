@@ -38,3 +38,7 @@ Release uploads retry transient HTTP/transport errors with bounded backoff.
 Before retrying, delete only the exact filename's incomplete starter/open asset,
 or accept an already uploaded asset only after matching its SHA-256 and size.
 Keep the bundle manifest last; never mark a partially uploaded bundle complete.
+Windows torch 1.6 backports upstream 409efeb's _UCRT_LEGACY_INFINITY define
+inside the MSVC CMake block. This fixes SDK >=25131/NVCC INFINITY parsing;
+keep it Windows-only, fail closed on changed source, and record the backport
+alongside the sm_30 allowlist in the bundle manifest.

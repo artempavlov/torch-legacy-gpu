@@ -216,6 +216,19 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_windows_sdk_backport_is_narrow_and_fails_closed(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            source = Path(directory)
+            target = source / "cmake/Dependencies.cmake"
+            target.parent.mkdir()
+            target.write_text("if(MSVC)\n  foreach(flag_var \n    CMAKE_C_FLAGS)\n  endforeach()\nendif()\n")
+            build.patch_windows_sdk(source)
+            self.assertIn("if(MSVC)\n  add_definitions(-D_UCRT_LEGACY_INFINITY)\n  foreach(flag_var ", target.read_text())
+            self.assertEqual(target.read_text().count("-D_UCRT_LEGACY_INFINITY"), 1)
+            with self.assertRaises(RuntimeError):
+                build.patch_windows_sdk(source)
+
     def test_linux_audio_repair_audits_the_prepared_wheel_without_excluding_its_libraries(self):
         (ROOT / ".tmp").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
