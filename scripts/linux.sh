@@ -22,7 +22,11 @@ if [[ "$PYTHON_VERSION" == 3.[678] ]]; then
     https://github.com/conda-forge/miniforge/releases/download/23.3.1-1/Miniforge3-23.3.1-1-Linux-x86_64.sh \
     -o /workspace/.tmp/miniforge.sh
   bash /workspace/.tmp/miniforge.sh -b -p /opt/conda
-  /opt/conda/bin/conda create -y --override-channels -c conda-forge -p /opt/python "python=$PYTHON_VERSION" pip
+  /opt/conda/bin/conda create -y --override-channels -c conda-forge -p /opt/python-base "python=$PYTHON_VERSION" pip
+  # Conda's old Python 3.6 environment can contain distutils-owned certifi.
+  # Keep pip-managed build dependencies separate instead of overwriting it.
+  /opt/python-base/bin/python -m venv /opt/python
+  /opt/python/bin/python -m pip install --upgrade pip
   export PATH="/opt/python/bin:$PATH"
 else
   curl --fail --location --retry 3 https://astral.sh/uv/install.sh -o /workspace/.tmp/uv-install.sh

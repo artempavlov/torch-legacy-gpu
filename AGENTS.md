@@ -22,3 +22,5 @@ recursive submodule commands (Windows FlashAttention paths); install `libxml2`
 before running the CUDA 10.2 installer. Prefer compatible binary dependencies,
 do not install CFFI for modern torch (it rejects Python 3.13t), and respect
 PyTorch 2.7's `setuptools<=75.8.2` limit.
+Old Python installed via Conda must be used as the base of an isolated venv;
+do not mix pip upgrades with Conda's distutils-owned packages (notably certifi).

@@ -189,6 +189,12 @@ class BuildCompatibilityTests(unittest.TestCase):
         apt = script.split("apt-get install", 1)[1].split("git config", 1)[0]
         self.assertIn("libxml2", apt.split())
 
+    def test_conda_python_is_only_a_base_for_an_isolated_build_venv(self):
+        script = (ROOT / "scripts/linux.sh").read_text()
+        self.assertIn('-p /opt/python-base "python=$PYTHON_VERSION"', script)
+        self.assertIn('/opt/python-base/bin/python -m venv /opt/python', script)
+        self.assertNotIn('--system-site-packages', script)
+
     def test_build_scripts_parse_on_python36(self):
         for name in ("build.py", "smoke.py"):
             ast.parse((ROOT / "scripts" / name).read_text(), feature_version=(3, 6))
