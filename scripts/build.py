@@ -80,6 +80,15 @@ def repair(wheel, out, cuda):
         run(sys.executable, "-m", "auditwheel", "repair", "--plat", manylinux_platform(), *exclude, "--wheel-dir", out, wheel)
 
 
+def create_smoke_environment(directory):
+    run(sys.executable, "-m", "venv", directory)
+    python = directory / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    # Python 3.6 seeds pip 18.1, which cannot install PEP 600 manylinux tags.
+    # pip selects the newest release compatible with the interpreter.
+    run(python, "-m", "pip", "install", "--upgrade", "pip")
+    return python
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", required=True)
@@ -177,8 +186,7 @@ def main():
     # Verify in a fresh environment, without the toolkit on the loader path.
     # Otherwise a broken wheel could pass by finding unbundled build libraries.
     fresh = work / "smoke-env"
-    run(sys.executable, "-m", "venv", fresh)
-    fresh_python = fresh / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    fresh_python = create_smoke_environment(fresh)
     run(fresh_python, "-m", "pip", "install", "--prefer-binary", "--constraint", constraints, *wheels)
     clean = env.copy()
     clean.pop("LD_LIBRARY_PATH", None)

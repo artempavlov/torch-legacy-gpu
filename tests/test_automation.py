@@ -157,6 +157,13 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_fresh_smoke_environment_upgrades_pip_before_wheel_installation(self):
+        with patch("build.sys.platform", "linux"), patch("build.run") as run:
+            python = build.create_smoke_environment(Path("smoke-env"))
+        self.assertEqual(python, Path("smoke-env/bin/python"))
+        self.assertEqual(run.call_args_list[0].args, (sys.executable, "-m", "venv", Path("smoke-env")))
+        self.assertEqual(run.call_args_list[1].args, (python, "-m", "pip", "install", "--upgrade", "pip"))
+
     def test_linux_repair_explicitly_targets_build_host_glibc(self):
         for version, machine in (("2.27", "x86_64"), ("2.35", "x86_64"), ("2.39", "aarch64")):
             with self.subTest(version=version, machine=machine), patch("build.sys.platform", "linux"), patch("build.os.confstr", return_value="glibc " + version), patch("platform.libc_ver", return_value=("glibc", "2.17")), patch("platform.machine", return_value=machine), patch("build.run") as run:
