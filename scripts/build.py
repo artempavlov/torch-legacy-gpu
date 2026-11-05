@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import subprocess
 import sys
@@ -47,6 +48,19 @@ def metadata(path):
         return archive.read(name).decode()
 
 
+def manylinux_platform():
+    # Python 3.6's platform.libc_ver scans the interpreter executable, which
+    # reports Conda's build baseline rather than this container's running libc.
+    try:
+        libc, version = os.confstr("CS_GNU_LIBC_VERSION").split()
+    except (AttributeError, OSError, ValueError):
+        raise RuntimeError("Cannot determine the build host's glibc ABI")
+    parts = version.split(".")
+    if libc != "glibc" or len(parts) < 2 or not all(p.isdigit() for p in parts[:2]):
+        raise RuntimeError("Cannot determine the build host's glibc ABI")
+    return "manylinux_" + "_".join(parts[:2]) + "_" + platform.machine()
+
+
 def repair(wheel, out, cuda):
     if sys.platform == "win32":
         # Don't vendor NVIDIA's driver: it belongs to the user's system.
@@ -54,13 +68,16 @@ def repair(wheel, out, cuda):
             "--exclude", "nvcuda.dll", "--wheel-dir", out, wheel)
     else:
         # CUDA libraries are redistributable runtime dependencies. libcuda is
-        # deliberately excluded (driver); auditwheel chooses an honest ABI tag.
+        # deliberately excluded (driver). Older auditwheel defaults to glibc
+        # 2.5, which rejects wheels built on Ubuntu 18.04 and later. Request the
+        # build host's conservative baseline; auditwheel still checks symbols
+        # and may additionally report an older ABI when the wheel supports it.
         exclude = ["--exclude", "libcuda.so.1"]
         if not wheel.name.startswith("torch-"):
             # These are supplied by the matching torch wheel, not by Linux.
             for library in ("libtorch.so", "libtorch_cpu.so", "libtorch_cuda.so", "libtorch_python.so", "libc10.so", "libc10_cuda.so"):
                 exclude.extend(["--exclude", library])
-        run(sys.executable, "-m", "auditwheel", "repair", *exclude, "--wheel-dir", out, wheel)
+        run(sys.executable, "-m", "auditwheel", "repair", "--plat", manylinux_platform(), *exclude, "--wheel-dir", out, wheel)
 
 
 def main():
@@ -107,7 +124,11 @@ def main():
         # 2.7's requirements.txt explicitly caps setuptools on Windows.
         setuptools = "setuptools<=75.8.2" if spec["name"] == "kepler" else "setuptools<82"
         pip("install", "--prefer-binary", setuptools, "wheel", "cmake>=3.27,<4", "ninja", "numpy<3", "pyyaml", "typing_extensions", "packaging", "six", "requests", "pillow", "filelock", "sympy", "networkx", "jinja2", "fsspec", "psutil", "astunparse", "optree>=0.13.0")
-    pip("install", "delvewheel" if sys.platform == "win32" else "auditwheel")
+    if sys.platform == "win32":
+        pip("install", "delvewheel")
+    else:
+        # Ubuntu ships older patchelf than current auditwheel accepts.
+        pip("install", "auditwheel", "patchelf>=0.14.5")
     sources = {}
     wheels = []
     torch_version = spec["torch"] + "+" + spec["local"]

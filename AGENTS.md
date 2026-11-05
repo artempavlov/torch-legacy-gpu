@@ -24,3 +24,7 @@ do not install CFFI for modern torch (it rejects Python 3.13t), and respect
 PyTorch 2.7's `setuptools<=75.8.2` limit.
 Old Python installed via Conda must be used as the base of an isolated venv;
 do not mix pip upgrades with Conda's distutils-owned packages (notably certifi).
+Always pass an explicit build-host glibc platform to auditwheel repair. Older
+auditwheel defaults to manylinux_2_5 and rejects the Ubuntu-built wheels.
+Install pip's patchelf>=0.14.5 alongside auditwheel; Ubuntu 18.04's system
+patchelf 0.9 and Ubuntu 22.04's 0.14.3 are too old for current auditwheel.

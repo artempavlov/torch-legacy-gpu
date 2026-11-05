@@ -67,8 +67,9 @@ the toolkit, architecture family and Python ABI; package names stay unchanged.
 
 An NVIDIA driver compatible with the chosen toolkit **and** your GPU is still
 required. Wheels bundle redistributable runtime dependencies, never the driver.
-Linux wheels carry the ABI tag determined by auditwheel; building on Ubuntu
-22.04/24.04 does not promise manylinux2014 compatibility.
+Linux repair explicitly targets the build image's glibc baseline: 2.27 for
+Ubuntu 18.04, 2.35 for 22.04 and 2.39 for 24.04. Auditwheel checks symbols and
+can add older compatible tags; these builds do not promise manylinux2014 support.
 
 ## What is reused from upstream?
 

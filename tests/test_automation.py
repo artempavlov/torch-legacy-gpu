@@ -157,13 +157,35 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_linux_repair_explicitly_targets_build_host_glibc(self):
+        for version, machine in (("2.27", "x86_64"), ("2.35", "x86_64"), ("2.39", "aarch64")):
+            with self.subTest(version=version, machine=machine), patch("build.sys.platform", "linux"), patch("build.os.confstr", return_value="glibc " + version), patch("platform.libc_ver", return_value=("glibc", "2.17")), patch("platform.machine", return_value=machine), patch("build.run") as run:
+                build.repair(Path("torch-test.whl"), Path("out"), Path("cuda"))
+                args = run.call_args.args
+                self.assertIn("--plat", args)
+                self.assertEqual(args[args.index("--plat") + 1], "manylinux_" + version.replace(".", "_") + "_" + machine)
+                self.assertIn("libcuda.so.1", args)
+
+    def test_linux_repair_does_not_guess_when_libc_is_unknown(self):
+        with patch("build.sys.platform", "linux"), patch("build.os.confstr", return_value=""), patch("build.run") as run:
+            with self.assertRaisesRegex(RuntimeError, "glibc"):
+                build.repair(Path("torch-test.whl"), Path("out"), Path("cuda"))
+            run.assert_not_called()
+
+    def test_windows_repair_does_not_use_a_manylinux_tag(self):
+        with patch("build.sys.platform", "win32"), patch("build.os.confstr") as libc, patch("build.run") as run:
+            build.repair(Path("torch-test.whl"), Path("out"), Path("cuda"))
+            self.assertIn("delvewheel", run.call_args.args)
+            self.assertNotIn("--plat", run.call_args.args)
+            libc.assert_not_called()
+
     def test_checkout_enables_long_paths_for_clone_and_recursive_submodules(self):
         with patch("build.run") as run, patch("build.subprocess.check_output", return_value=b"sha\n"):
             build.checkout("pytorch", "2.7.1", Path("source"))
         for call in run.call_args_list:
             self.assertEqual(call.args[:3], ("git", "-c", "core.longpaths=true"))
 
-    def bootstrap_command(self, minor):
+    def bootstrap_command(self, minor, index=0):
         (ROOT / ".tmp").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
             root = Path(directory)
@@ -173,7 +195,11 @@ class BuildCompatibilityTests(unittest.TestCase):
             with patch("build.Path.cwd", return_value=root), patch("build.sys.argv", ["build.py", "--spec", str(spec), "--output", str(root / "dist")]), patch("build.sys.version_info", Mock(minor=minor)), patch("build.pip") as pip, patch("build.checkout", side_effect=RuntimeError("stop before compilation")), patch.dict(os.environ):
                 with self.assertRaisesRegex(RuntimeError, "stop before compilation"):
                     build.main()
-            return pip.call_args_list[0].args
+            return pip.call_args_list[index].args
+
+    def test_linux_repair_installs_patchelf_new_enough_for_auditwheel(self):
+        with patch("build.sys.platform", "linux"):
+            self.assertIn("patchelf>=0.14.5", self.bootstrap_command(7, 1))
 
     def test_modern_bootstrap_does_not_require_cffi_on_python313t(self):
         self.assertNotIn("cffi", self.bootstrap_command(13))
