@@ -1,0 +1,12 @@
+{
+  "revision": 1,
+  "first_release": "2.15.0",
+  "lanes": [
+    {"name": "kepler30", "torch": "1.6.0", "vision": "0.7.0", "audio": "0.6.0", "cuda": "10.2.89", "image": "ubuntu:18.04", "architectures": ["3.0"], "python": ["3.6", "3.7", "3.8"], "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "kepler", "torch": "2.7.1", "cuda": "11.8.0", "image": "11.8.0-devel-ubuntu22.04", "architectures": ["3.5", "3.7"], "python": ["3.9", "3.10", "3.11", "3.12", "3.13", "3.13t"], "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "maxwell", "torch": "latest", "cuda": "12.6.3", "image": "12.6.3-devel-ubuntu22.04", "architectures": ["5.0", "5.2"], "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "pascal", "torch": "latest", "cuda": "12.6.3", "image": "12.6.3-devel-ubuntu22.04", "architectures": ["6.0", "6.1"], "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "volta", "torch": "latest", "cuda": "12.6.3", "image": "12.6.3-devel-ubuntu22.04", "architectures": ["7.0"], "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]},
+    {"name": "modern", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["7.5", "8.0", "8.6", "8.9", "9.0", "10.0", "12.0+PTX"], "arm_architectures": ["8.0", "9.0", "10.0", "11.0", "12.0+PTX"], "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]}
+  ]
+}

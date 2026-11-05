@@ -1,0 +1,11 @@
+.opencode/
+.tmp/
+__pycache__/
+*.pyc
+.venv/
+work/
+dist/
+*.egg-info/
+plan.json
+catalog.json
+spec.json

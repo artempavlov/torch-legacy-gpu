@@ -1,0 +1,6 @@
+{
+  "versions": ["2.15.0"],
+  "document": "| PyTorch version | Python | C++ | Stable CUDA |\n| 2.15 | >=3.11, <=(3.15, 3.15t experimental) | C++20 | CUDA 13.2 |\n",
+  "torchvision": "0.29.2",
+  "torchaudio": "2.11.1"
+}
