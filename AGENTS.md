@@ -34,3 +34,7 @@ Before Linux torchaudio repair, unpack the wheel, add $ORIGIN to each bundled
 ELF's RPATH, then repack with wheel to regenerate RECORD. Upstream CMake strips
 the install RPATH; without this, auditwheel cannot resolve sibling libraries
 such as libtorchaudio.so. Never exclude these bundled libraries from repair.
+Release uploads retry transient HTTP/transport errors with bounded backoff.
+Before retrying, delete only the exact filename's incomplete starter/open asset,
+or accept an already uploaded asset only after matching its SHA-256 and size.
+Keep the bundle manifest last; never mark a partially uploaded bundle complete.

@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import os
+import http.client
 from pathlib import Path
 import sys
 import tempfile
@@ -16,6 +17,63 @@ from build import patch_sm30
 import build
 from plan import compatible_domain, matrix_rows, python_versions, release_tag, stable_releases
 from publish import finalize, publish_bundle, validate_bundle
+from github_api import GitHub
+
+
+class UploadTests(unittest.TestCase):
+    def setUp(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(dir=ROOT / ".tmp")
+        self.addCleanup(temporary.cleanup)
+        self.path = Path(temporary.name) / "test+cuda.whl"
+        self.path.write_bytes(b"complete wheel contents")
+        self.gh = GitHub("test/repo")
+        self.release = {"id": 1, "upload_url": "https://uploads.github.com/repos/test/repo/releases/1/assets{?name,label}"}
+
+    def connection(self, status):
+        connection = Mock()
+        connection.getresponse.return_value.status = status
+        connection.getresponse.return_value.read.return_value = b'{"id": 5}'
+        return connection
+
+    def test_server_failure_retries_full_body_and_removes_only_its_starter(self):
+        first, second = self.connection(500), self.connection(201)
+        with patch("github_api.http.client.HTTPSConnection", side_effect=[first, second]), patch("github_api.time.sleep") as sleep, patch.object(self.gh, "assets", return_value=[{"id": 9, "name": self.path.name, "state": "starter"}, {"id": 10, "name": "other.whl", "state": "starter"}]), patch.object(self.gh, "request") as request:
+            self.assertEqual(self.gh.upload(self.release, self.path), {"id": 5})
+        request.assert_called_once_with("/repos/test/repo/releases/assets/9", "DELETE")
+        sleep.assert_called_once_with(2)
+        for connection in (first, second):
+            connection.send.assert_called_once_with(self.path.read_bytes())
+            connection.close.assert_called_once()
+
+    def test_lost_response_recognizes_an_already_committed_matching_upload(self):
+        connection = self.connection(201)
+        connection.getresponse.side_effect = http.client.RemoteDisconnected("lost response")
+        asset = {"id": 9, "name": self.path.name, "state": "uploaded", "size": self.path.stat().st_size, "digest": "sha256:" + hashlib.sha256(self.path.read_bytes()).hexdigest()}
+        with patch("github_api.http.client.HTTPSConnection", return_value=connection) as factory, patch("github_api.time.sleep"), patch.object(self.gh, "assets", return_value=[asset]), patch.object(self.gh, "request") as request:
+            self.assertEqual(self.gh.upload(self.release, self.path), asset)
+        factory.assert_called_once()
+        request.assert_not_called()
+
+    def test_completed_asset_with_wrong_digest_is_not_deleted_or_accepted(self):
+        with patch("github_api.http.client.HTTPSConnection", return_value=self.connection(502)), patch("github_api.time.sleep"), patch.object(self.gh, "assets", return_value=[{"id": 9, "name": self.path.name, "state": "uploaded", "size": self.path.stat().st_size, "digest": "sha256:wrong"}]), patch.object(self.gh, "request") as request:
+            with self.assertRaisesRegex(RuntimeError, "verify"):
+                self.gh.upload(self.release, self.path)
+        request.assert_not_called()
+
+    def test_permanent_http_error_is_not_retried(self):
+        with patch("github_api.http.client.HTTPSConnection", return_value=self.connection(401)) as factory, patch("github_api.time.sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 401"):
+                self.gh.upload(self.release, self.path)
+        factory.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_transient_http_retries_are_bounded(self):
+        with patch("github_api.http.client.HTTPSConnection", side_effect=[self.connection(503) for _ in range(4)]) as factory, patch("github_api.time.sleep") as sleep, patch.object(self.gh, "assets", return_value=[]):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 503"):
+                self.gh.upload(self.release, self.path)
+        self.assertEqual(factory.call_count, 4)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8])
 
 
 class PlanningTests(unittest.TestCase):

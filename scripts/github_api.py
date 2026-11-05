@@ -1,5 +1,6 @@
 """Small GitHub API client; the build process never receives the write token."""
 import json
+import hashlib
 import os
 import time
 import urllib.error
@@ -63,21 +64,47 @@ class GitHub:
         name = urllib.parse.quote(path.name)
         url = release["upload_url"].split("{")[0] + "?name=" + name
         parsed = urllib.parse.urlsplit(url)
-        connection = http.client.HTTPSConnection(parsed.hostname, timeout=600)
-        try:
-            connection.putrequest("POST", parsed.path + "?" + parsed.query)
-            connection.putheader("Authorization", "Bearer " + self.token)
-            connection.putheader("User-Agent", "torch-legacy-gpu")
-            connection.putheader("Content-Type", "application/octet-stream")
-            connection.putheader("Content-Length", str(path.stat().st_size))
-            connection.endheaders()
-            with path.open("rb") as source:
-                while block := source.read(1024 * 1024):
-                    connection.send(block)
-            response = connection.getresponse()
-            body = response.read()
-            if response.status != 201:
-                raise RuntimeError(f"Upload {path.name}: HTTP {response.status}: {body[:500]!r}")
-            return json.loads(body)
-        finally:
-            connection.close()
+        for attempt in range(4):
+            if attempt:
+                # An interrupted POST can leave either an empty starter or a
+                # completed upload whose response was lost. Reconcile only our
+                # exact filename; never touch another bundle's assets.
+                for asset in self.assets(release):
+                    if asset["name"] != path.name:
+                        continue
+                    if asset["state"] == "uploaded":
+                        digest = hashlib.sha256()
+                        with path.open("rb") as source:
+                            while block := source.read(1024 * 1024):
+                                digest.update(block)
+                        if asset["size"] == path.stat().st_size and asset.get("digest") == "sha256:" + digest.hexdigest():
+                            return asset
+                        raise RuntimeError(f"Cannot verify existing upload: {path.name}")
+                    if asset["state"] not in ("starter", "open"):
+                        raise RuntimeError(f"Unexpected upload state for {path.name}: {asset['state']}")
+                    self.request(f"/repos/{self.repository}/releases/assets/{asset['id']}", "DELETE")
+            connection = http.client.HTTPSConnection(parsed.hostname, timeout=600)
+            try:
+                connection.putrequest("POST", parsed.path + "?" + parsed.query)
+                connection.putheader("Authorization", "Bearer " + self.token)
+                connection.putheader("User-Agent", "torch-legacy-gpu")
+                connection.putheader("Content-Type", "application/octet-stream")
+                connection.putheader("Content-Length", str(path.stat().st_size))
+                connection.endheaders()
+                with path.open("rb") as source:
+                    while block := source.read(1024 * 1024):
+                        connection.send(block)
+                response = connection.getresponse()
+                body = response.read()
+                if response.status == 201:
+                    return json.loads(body)
+                message = f"Upload {path.name}: HTTP {response.status}: {body[:500]!r}"
+                retry = response.status in (429, 500, 502, 503, 504) or (attempt > 0 and response.status == 422)
+            except (OSError, http.client.HTTPException) as error:
+                message = f"Upload {path.name}: {type(error).__name__}: {error}"
+                retry = True
+            finally:
+                connection.close()
+            if not retry or attempt == 3:
+                raise RuntimeError(message)
+            time.sleep(2 ** (attempt + 1))
