@@ -164,6 +164,7 @@ class BuildCompatibilityTests(unittest.TestCase):
             self.assertEqual(call.args[:3], ("git", "-c", "core.longpaths=true"))
 
     def bootstrap_command(self, minor):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
             root = Path(directory)
             spec = root / "spec.json"
