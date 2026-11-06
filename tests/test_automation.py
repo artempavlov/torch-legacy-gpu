@@ -4,8 +4,10 @@ import hashlib
 import json
 import os
 import http.client
+import io
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -217,6 +219,36 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_cuda102_thrust_retry_resumes_the_same_build_after_known_compiler_failure(self):
+        error = "C:/CUDA/v10.2/include/thrust/detail/type_traits/is_metafunction_defined.h(28): error C2993: 'T': invalid type for non-type template parameter '__formal'\n"
+        first = Mock(stdout=io.StringIO(error))
+        first.wait.return_value = 1
+        second = Mock(stdout=io.StringIO("build succeeded\n"))
+        second.wait.return_value = 0
+        with patch("build.subprocess.Popen", side_effect=[first, second]) as popen:
+            build.run_cuda102_windows_build("compiler", "same-build", cwd="source", env={})
+        self.assertEqual(popen.call_count, 2)
+        self.assertEqual(popen.call_args_list[0], popen.call_args_list[1])
+
+    def test_cuda102_thrust_retry_does_not_retry_other_build_errors(self):
+        process = Mock(stdout=io.StringIO("source.cpp(1): error C2993: invalid template '__formal'\n"))
+        process.wait.return_value = 1
+        with patch("build.subprocess.Popen", return_value=process) as popen:
+            with self.assertRaises(subprocess.CalledProcessError):
+                build.run_cuda102_windows_build("compiler")
+        self.assertEqual(popen.call_count, 1)
+
+    def test_cuda102_thrust_retry_is_bounded(self):
+        error = "C:/CUDA/v10.2/include/thrust/detail/type_traits/is_metafunction_defined.h(28): error C2993: 'T': non-type template parameter '__formal'\n"
+        def failed(*args, **kwargs):
+            process = Mock(stdout=io.StringIO(error))
+            process.wait.return_value = 1
+            return process
+        with patch("build.subprocess.Popen", side_effect=failed) as popen:
+            with self.assertRaises(subprocess.CalledProcessError):
+                build.run_cuda102_windows_build("compiler")
+        self.assertEqual(popen.call_count, 5)
+
     def test_companion_version_bounds_exclude_local_labels_but_accept_local_torch(self):
         spec = {"torch": "2.15.0", "local": "cu126.maxwell.cp314"}
         env = build.torch_version_environment(spec)

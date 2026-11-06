@@ -25,6 +25,30 @@ def pip(*args, **kwargs):
     return run(sys.executable, "-m", "pip", *args, **kwargs)
 
 
+def run_cuda102_windows_build(*args, **kwargs):
+    # NVIDIA/thrust#1090: NVCC 10.2 intermittently corrupts template expansion
+    # before handing it to MSVC. Resume the same incremental build, at most
+    # five times, only when its specific Thrust C2993 signature was observed.
+    command = [str(a) for a in args]
+    for attempt in range(5):
+        print("+", " ".join(command), flush=True)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   universal_newlines=True, encoding="utf-8", errors="replace", **kwargs)
+        known_failure = False
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            normalized = line.lower().replace("\\", "/")
+            if all(s in normalized for s in ("v10.2/", "/thrust/", "error c2993:", "__formal")):
+                known_failure = True
+        process.stdout.close()
+        code = process.wait()
+        if code == 0:
+            return
+        if not known_failure or attempt == 4:
+            raise subprocess.CalledProcessError(code, command)
+        print("Retrying incremental CUDA 10.2 build after known Thrust C2993 failure", flush=True)
+
+
 def checkout(repository, version, destination):
     # -c is inherited by recursive Git processes, unlike a parent repo's local
     # config. FlashAttention's nested paths exceed Windows' default 260 chars.
@@ -220,7 +244,9 @@ def main():
         if modern_backend:
             pip("wheel", "--no-deps", "--wheel-dir", raw, source, env=env)
         else:
-            run(sys.executable, "setup.py", "bdist_wheel", "--dist-dir", raw, cwd=str(source), env=env)
+            legacy_windows = package == "torch" and spec["name"] == "kepler30" and sys.platform == "win32"
+            build_command = run_cuda102_windows_build if legacy_windows else run
+            build_command(sys.executable, "setup.py", "bdist_wheel", "--dist-dir", raw, cwd=str(source), env=env)
         built = list(raw.glob("*.whl"))
         if len(built) != 1:
             raise RuntimeError("Expected exactly one upstream wheel for " + package)

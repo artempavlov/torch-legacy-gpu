@@ -49,3 +49,6 @@ Windows delvewheel repair needs both --ignore-existing and --analyze-existing:
 resolve bundled DLLs in-wheel without renaming them, while checking their
 transitive dependencies. Companion wheels exclude the DLLs supplied by the
 matching installed torch, not their own bundled audio/vision libraries.
+CUDA 10.2/Windows torch builds may retry the same incremental build at most
+five times for NVCC's known Thrust C2993/__formal bug (NVIDIA/thrust#1090).
+Keep the exact toolkit/header/error signature gate; other failures fail normally.
