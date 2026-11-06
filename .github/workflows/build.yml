@@ -108,8 +108,10 @@ jobs:
       - name: Install Visual Studio 2019 for legacy CUDA
         if: runner.os == 'Windows' && (matrix.name == 'kepler30' || matrix.name == 'kepler')
         shell: pwsh
+        env:
+          LEGACY_COMPONENTS: ${{ matrix.name == 'kepler30' && '--add Microsoft.VisualStudio.Component.VC.v141.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK.18362' || '' }}
         run: |
-          choco install visualstudio2019buildtools --yes --no-progress --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart"
+          choco install visualstudio2019buildtools --yes --no-progress --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools $env:LEGACY_COMPONENTS --includeRecommended --quiet --norestart"
           if ($LASTEXITCODE -notin @(0,3010)) { exit $LASTEXITCODE }
       - name: Select MSVC toolchain
         if: runner.os == 'Windows'
@@ -117,6 +119,17 @@ jobs:
         with:
           arch: x64
           vsversion: ${{ (matrix.name == 'kepler30' || matrix.name == 'kepler') && '2019' || '2022' }}
+          toolset: ${{ matrix.name == 'kepler30' && '14.16' || '' }}
+          sdk: ${{ matrix.name == 'kepler30' && '10.0.18362.0' || '' }}
+      - name: Verify CUDA 10.2 host compiler
+        if: runner.os == 'Windows' && matrix.name == 'kepler30'
+        shell: pwsh
+        run: |
+          if ($env:VCToolsVersion -notlike '14.16.*') { throw "CUDA 10.2 requires the selected v141 compiler, got $env:VCToolsVersion" }
+          if ($env:WindowsSDKVersion.TrimEnd('\') -ne '10.0.18362.0') { throw "Unexpected Windows SDK: $env:WindowsSDKVersion" }
+          cl /Bv 2>&1 | Out-Host
+          # cl without a source prints its version and exits nonzero.
+          exit 0
       - name: Install CUDA on Windows
         if: runner.os == 'Windows'
         uses: Jimver/cuda-toolkit@v0.2.36
