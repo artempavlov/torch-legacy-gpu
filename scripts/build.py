@@ -127,6 +127,17 @@ def create_smoke_environment(directory):
     return python
 
 
+def torch_version_environment(spec):
+    version = spec["torch"] + "+" + spec["local"]
+    major, minor, _ = spec["torch"].split(".")
+    return {"PYTORCH_BUILD_VERSION": version, "PYTORCH_BUILD_NUMBER": "1",
+            "PYTORCH_VERSION": version,
+            # PEP 440 forbids local labels in >= bounds. The runtime
+            # constraints file below still pins the exact local torch wheel.
+            "PYTORCH_VERSION_GE": spec["torch"],
+            "PYTORCH_VERSION_LT": major + "." + str(int(minor) + 1)}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", required=True)
@@ -178,14 +189,8 @@ def main():
         pip("install", "auditwheel", "patchelf>=0.14.5")
     sources = {}
     wheels = []
-    torch_version = spec["torch"] + "+" + spec["local"]
-    env["PYTORCH_BUILD_VERSION"] = torch_version
-    env["PYTORCH_BUILD_NUMBER"] = "1"
-    env["PYTORCH_VERSION"] = torch_version
-    env["PYTORCH_VERSION_GE"] = torch_version
-    # Modern torchvision supports third-party pins via a GE/LT pair.
-    major, minor, _ = spec["torch"].split(".")
-    env["PYTORCH_VERSION_LT"] = major + "." + str(int(minor) + 1)
+    env.update(torch_version_environment(spec))
+    torch_version = env["PYTORCH_BUILD_VERSION"]
     for repository, package, version in (("pytorch", "torch", spec["torch"]), ("vision", "torchvision", spec["vision"]), ("audio", "torchaudio", spec["audio"])):
         source = work / repository
         sources[repository] = checkout(repository, version, source)

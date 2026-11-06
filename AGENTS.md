@@ -42,3 +42,6 @@ Windows torch 1.6 backports upstream 409efeb's _UCRT_LEGACY_INFINITY define
 inside the MSVC CMake block. This fixes SDK >=25131/NVCC INFINITY parsing;
 keep it Windows-only, fail closed on changed source, and record the backport
 alongside the sm_30 allowlist in the bundle manifest.
+Keep PYTORCH_VERSION_GE as a public version without a +local label: PEP 440
+allows local labels only in ==/!= requirements. PYTORCH_VERSION and the runtime
+constraints must still pin the exact locally built torch wheel.

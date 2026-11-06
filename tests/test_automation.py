@@ -10,6 +10,7 @@ import tempfile
 import unittest
 import zipfile
 from unittest.mock import Mock, patch
+from packaging.requirements import Requirement
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -216,6 +217,15 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_companion_version_bounds_exclude_local_labels_but_accept_local_torch(self):
+        spec = {"torch": "2.15.0", "local": "cu126.maxwell.cp314"}
+        env = build.torch_version_environment(spec)
+        requirement = Requirement("torch>=" + env["PYTORCH_VERSION_GE"] + ",<" + env["PYTORCH_VERSION_LT"])
+        self.assertIn("2.15.0+cu126.maxwell.cp314", requirement.specifier)
+        self.assertNotIn("2.16.0", requirement.specifier)
+        self.assertEqual(env["PYTORCH_VERSION"], "2.15.0+cu126.maxwell.cp314")
+        self.assertEqual(env["PYTORCH_BUILD_VERSION"], env["PYTORCH_VERSION"])
+
     def test_windows_sdk_backport_is_narrow_and_fails_closed(self):
         (ROOT / ".tmp").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
