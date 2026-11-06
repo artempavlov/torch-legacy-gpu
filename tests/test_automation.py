@@ -219,6 +219,17 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_windows_repair_searches_separately_installed_nvtx_runtime(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            nvtx = Path(directory) / "NvToolsExt"
+            (nvtx / "bin/x64").mkdir(parents=True)
+            with patch.dict(os.environ, {"NVTOOLSEXT_PATH": str(nvtx)}), patch("build.sys.platform", "win32"), patch("build.run") as run:
+                build.repair(Path("torch-test.whl"), Path("out"), Path("cuda"))
+            args = run.call_args.args
+            self.assertIn(str(nvtx / "bin/x64"), args[args.index("--add-path") + 1].split(os.pathsep))
+            self.assertEqual(args[args.index("--exclude") + 1], "nvcuda.dll")
+
     def test_windows_repair_uses_modern_control_python_for_old_target_wheels(self):
         with patch.dict(os.environ, {"WHEEL_REPAIR_PYTHON": "control/python.exe"}), patch("build.sys.platform", "win32"), patch("build.run") as run:
             build.repair(Path("torch-1.6-cp36-cp36m-win_amd64.whl"), Path("out"), Path("cuda"))

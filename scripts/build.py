@@ -122,6 +122,13 @@ def repair(wheel, out, cuda):
     if sys.platform == "win32":
         # Don't vendor NVIDIA's driver: it belongs to the user's system.
         exclude = ["nvcuda.dll"]
+        search_paths = [str(cuda / "bin")]
+        # Old CUDA installs NVTX outside the toolkit. Match upstream torch's
+        # NVTOOLSEXT_PATH/default lookup and vendor the redistributable DLL.
+        program_files = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+        nvtx = Path(os.environ.get("NVTOOLSEXT_PATH", str(program_files / "NVIDIA Corporation/NvToolsExt"))) / "bin/x64"
+        if nvtx.is_dir():
+            search_paths.append(str(nvtx))
         if not wheel.name.startswith("torch-"):
             # torch is installed before its companions and loads its own DLLs.
             # Do not duplicate or rename those shared libraries in each wheel.
@@ -131,7 +138,7 @@ def repair(wheel, out, cuda):
         # Upstream already bundles torch/lib (and audio's sibling DLLs).
         # Resolve these in-wheel, preserve their names, but still audit their
         # transitive dependencies and vendor missing CUDA runtime libraries.
-        run(os.environ.get("WHEEL_REPAIR_PYTHON", sys.executable), "-m", "delvewheel", "repair", "--add-path", str(cuda / "bin"),
+        run(os.environ.get("WHEEL_REPAIR_PYTHON", sys.executable), "-m", "delvewheel", "repair", "--add-path", os.pathsep.join(search_paths),
             "--ignore-existing", "--analyze-existing",
             "--exclude", ";".join(exclude), "--wheel-dir", out, wheel)
     else:

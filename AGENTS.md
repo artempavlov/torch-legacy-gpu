@@ -63,3 +63,6 @@ Preserve the control-plane Python as WHEEL_REPAIR_PYTHON before selecting the
 Windows target interpreter. Install/run delvewheel>=1.13.2 with that executable:
 Python 3.6 otherwise resolves an obsolete CLI without the required repair flags.
 Companion DLL exclusions still come from the target interpreter's installed torch.
+Windows repair also searches NVTOOLSEXT_PATH/bin/x64 (default ProgramFiles/
+NVIDIA Corporation/NvToolsExt/bin/x64). CUDA 10.2 installs its NVTX DLL outside
+CUDA/bin; vendor that runtime, never exclude it as if it were a system driver.
