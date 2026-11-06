@@ -301,6 +301,27 @@ class BuildCompatibilityTests(unittest.TestCase):
             self.assertNotIn("--plat", run.call_args.args)
             libc.assert_not_called()
 
+    def test_windows_repair_resolves_and_analyzes_dlls_already_in_the_wheel(self):
+        with patch("build.sys.platform", "win32"), patch("build.run") as run:
+            build.repair(Path("torch-test.whl"), Path("out"), Path("cuda"))
+        self.assertIn("--ignore-existing", run.call_args.args)
+        self.assertIn("--analyze-existing", run.call_args.args)
+        self.assertEqual(run.call_args.args[run.call_args.args.index("--exclude") + 1], "nvcuda.dll")
+
+    def test_windows_companions_use_dlls_from_the_matching_installed_torch(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            root = Path(directory)
+            libraries = root / "torch/lib"
+            libraries.mkdir(parents=True)
+            (libraries / "torch_python.dll").touch()
+            (libraries / "c10.DLL").touch()
+            (libraries / "torch.lib").touch()
+            with patch("build.sys.platform", "win32"), patch("build.sysconfig.get_path", return_value=str(root)), patch("build.run") as run:
+                build.repair(Path("torchvision-test.whl"), root, Path("cuda"))
+            excluded = run.call_args.args[run.call_args.args.index("--exclude") + 1].split(";")
+            self.assertEqual(set(excluded), {"nvcuda.dll", "torch_python.dll", "c10.DLL"})
+
     def test_checkout_enables_long_paths_for_clone_and_recursive_submodules(self):
         with patch("build.run") as run, patch("build.subprocess.check_output", return_value=b"sha\n"):
             build.checkout("pytorch", "2.7.1", Path("source"))

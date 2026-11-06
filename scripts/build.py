@@ -11,6 +11,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import zipfile
 
@@ -96,8 +97,19 @@ def prepare_audio_wheel(wheel, scratch):
 def repair(wheel, out, cuda):
     if sys.platform == "win32":
         # Don't vendor NVIDIA's driver: it belongs to the user's system.
+        exclude = ["nvcuda.dll"]
+        if not wheel.name.startswith("torch-"):
+            # torch is installed before its companions and loads its own DLLs.
+            # Do not duplicate or rename those shared libraries in each wheel.
+            libraries = Path(sysconfig.get_path("platlib")) / "torch/lib"
+            exclude.extend(sorted(p.name for p in libraries.glob("*")
+                                  if p.is_file() and p.suffix.lower() == ".dll"))
+        # Upstream already bundles torch/lib (and audio's sibling DLLs).
+        # Resolve these in-wheel, preserve their names, but still audit their
+        # transitive dependencies and vendor missing CUDA runtime libraries.
         run(sys.executable, "-m", "delvewheel", "repair", "--add-path", str(cuda / "bin"),
-            "--exclude", "nvcuda.dll", "--wheel-dir", out, wheel)
+            "--ignore-existing", "--analyze-existing",
+            "--exclude", ";".join(exclude), "--wheel-dir", out, wheel)
     else:
         # CUDA libraries are redistributable runtime dependencies. libcuda is
         # deliberately excluded (driver). Older auditwheel defaults to glibc

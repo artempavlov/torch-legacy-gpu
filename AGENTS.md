@@ -45,3 +45,7 @@ alongside the sm_30 allowlist in the bundle manifest.
 Keep PYTORCH_VERSION_GE as a public version without a +local label: PEP 440
 allows local labels only in ==/!= requirements. PYTORCH_VERSION and the runtime
 constraints must still pin the exact locally built torch wheel.
+Windows delvewheel repair needs both --ignore-existing and --analyze-existing:
+resolve bundled DLLs in-wheel without renaming them, while checking their
+transitive dependencies. Companion wheels exclude the DLLs supplied by the
+matching installed torch, not their own bundled audio/vision libraries.
