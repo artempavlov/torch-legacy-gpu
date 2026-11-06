@@ -219,6 +219,17 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_output_is_absolute_even_when_python36_resolve_leaves_missing_paths_unchanged(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            root = Path(directory)
+            spec = root / "spec.json"
+            spec.write_text(json.dumps({"name": "kepler30", "architectures": ["3.0"]}))
+            with patch("build.Path.cwd", return_value=root), patch("build.Path.resolve", lambda p: p), patch("build.Path.mkdir", autospec=True) as mkdir, patch("build.sys.argv", ["build.py", "--spec", str(spec), "--output", "dist"]), patch("build.pip", side_effect=RuntimeError("stop before compilation")):
+                with self.assertRaisesRegex(RuntimeError, "stop before compilation"):
+                    build.main()
+            self.assertIn(root / "dist", [c.args[0] for c in mkdir.call_args_list])
+
     def test_windows_repair_searches_separately_installed_nvtx_runtime(self):
         (ROOT / ".tmp").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:

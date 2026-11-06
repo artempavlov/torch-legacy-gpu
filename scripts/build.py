@@ -195,7 +195,9 @@ def main():
     spec = json.loads(Path(args.spec).read_text())
     root = Path.cwd().resolve()
     work = root / "work"
-    out = Path(args.output).resolve()
+    # Python 3.6/Windows resolve() can leave a missing relative path unchanged.
+    # Anchor it before creating dist or changing cwd for the fresh smoke test.
+    out = (root / args.output).resolve()
     work.mkdir(exist_ok=True)
     out.mkdir(exist_ok=True)
     cuda = Path(os.environ.get("CUDA_PATH", "/usr/local/cuda"))

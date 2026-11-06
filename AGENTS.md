@@ -66,3 +66,6 @@ Companion DLL exclusions still come from the target interpreter's installed torc
 Windows repair also searches NVTOOLSEXT_PATH/bin/x64 (default ProgramFiles/
 NVIDIA Corporation/NvToolsExt/bin/x64). CUDA 10.2 installs its NVTX DLL outside
 CUDA/bin; vendor that runtime, never exclude it as if it were a system driver.
+Anchor output paths to the absolute project root before resolve()/mkdir().
+Python 3.6/Windows can leave a missing relative path unchanged, which breaks
+the smoke report after changing cwd to work/ even though imports and ops pass.
