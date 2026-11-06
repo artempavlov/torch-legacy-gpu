@@ -59,3 +59,7 @@ Check VCToolsVersion/WindowsSDKVersion before compiling; newer lanes stay unchan
 Verify SDK headers/import libraries on disk before activating MSVC. The VS 2019
 installation did not supply SDK 18362 despite returning success; use its recommended
 19041 component instead, and fail early if installation is incomplete.
+Preserve the control-plane Python as WHEEL_REPAIR_PYTHON before selecting the
+Windows target interpreter. Install/run delvewheel>=1.13.2 with that executable:
+Python 3.6 otherwise resolves an obsolete CLI without the required repair flags.
+Companion DLL exclusions still come from the target interpreter's installed torch.

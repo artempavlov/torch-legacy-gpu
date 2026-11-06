@@ -113,6 +113,10 @@ jobs:
         run: |
           choco install visualstudio2019buildtools --yes --no-progress --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools $env:LEGACY_COMPONENTS --includeRecommended --quiet --norestart"
           if ($LASTEXITCODE -notin @(0,3010)) { exit $LASTEXITCODE }
+      - name: Preserve modern Python for Windows wheel repair
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python -c 'import os,sys; open(os.environ["GITHUB_ENV"], "a", encoding="utf-8").write("WHEEL_REPAIR_PYTHON=" + sys.executable + "\n")'
       - name: Verify legacy Windows SDK installation
         if: runner.os == 'Windows' && matrix.name == 'kepler30'
         shell: pwsh

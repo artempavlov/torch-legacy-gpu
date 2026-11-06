@@ -219,6 +219,16 @@ class PublicationTests(unittest.TestCase):
 
 
 class BuildCompatibilityTests(unittest.TestCase):
+    def test_windows_repair_uses_modern_control_python_for_old_target_wheels(self):
+        with patch.dict(os.environ, {"WHEEL_REPAIR_PYTHON": "control/python.exe"}), patch("build.sys.platform", "win32"), patch("build.run") as run:
+            build.repair(Path("torch-1.6-cp36-cp36m-win_amd64.whl"), Path("out"), Path("cuda"))
+        self.assertEqual(run.call_args.args[:4], ("control/python.exe", "-m", "delvewheel", "repair"))
+
+    def test_windows_repair_tool_is_installed_with_modern_python(self):
+        with patch.dict(os.environ, {"WHEEL_REPAIR_PYTHON": "control/python.exe"}), patch("build.run") as run:
+            build.install_windows_repair_tool()
+        self.assertEqual(run.call_args.args, ("control/python.exe", "-m", "pip", "install", "delvewheel>=1.13.2"))
+
     def test_cuda102_windows_pins_supported_v141_toolset_and_period_sdk(self):
         workflow = (ROOT / ".github/workflows/build.yml").read_text()
         self.assertIn("Microsoft.VisualStudio.Component.VC.v141.x86.x64", workflow)

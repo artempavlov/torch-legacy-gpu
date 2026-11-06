@@ -131,7 +131,7 @@ def repair(wheel, out, cuda):
         # Upstream already bundles torch/lib (and audio's sibling DLLs).
         # Resolve these in-wheel, preserve their names, but still audit their
         # transitive dependencies and vendor missing CUDA runtime libraries.
-        run(sys.executable, "-m", "delvewheel", "repair", "--add-path", str(cuda / "bin"),
+        run(os.environ.get("WHEEL_REPAIR_PYTHON", sys.executable), "-m", "delvewheel", "repair", "--add-path", str(cuda / "bin"),
             "--ignore-existing", "--analyze-existing",
             "--exclude", ";".join(exclude), "--wheel-dir", out, wheel)
     else:
@@ -161,6 +161,12 @@ def create_smoke_environment(directory):
     # pip selects the newest release compatible with the interpreter.
     run(python, "-m", "pip", "install", "--upgrade", "pip")
     return python
+
+
+def install_windows_repair_tool():
+    # Modern delvewheel runs independently of the target wheel's Python ABI.
+    # Installing it into Python 3.6 silently selects an obsolete CLI instead.
+    run(os.environ.get("WHEEL_REPAIR_PYTHON", sys.executable), "-m", "pip", "install", "delvewheel>=1.13.2")
 
 
 def torch_version_environment(spec):
@@ -219,7 +225,7 @@ def main():
         setuptools = "setuptools<=75.8.2" if spec["name"] == "kepler" else "setuptools<82"
         pip("install", "--prefer-binary", setuptools, "wheel", "cmake>=3.27,<4", "ninja", "numpy<3", "pyyaml", "typing_extensions", "packaging", "six", "requests", "pillow", "filelock", "sympy", "networkx", "jinja2", "fsspec", "psutil", "astunparse", "optree>=0.13.0")
     if sys.platform == "win32":
-        pip("install", "delvewheel")
+        install_windows_repair_tool()
     else:
         # Ubuntu ships older patchelf than current auditwheel accepts.
         pip("install", "auditwheel", "patchelf>=0.14.5")
