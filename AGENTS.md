@@ -52,7 +52,10 @@ matching installed torch, not their own bundled audio/vision libraries.
 CUDA 10.2/Windows torch builds may retry the same incremental build at most
 five times for NVCC's known Thrust C2993/__formal bug (NVIDIA/thrust#1090).
 Keep the exact toolkit/header/error signature gate; other failures fail normally.
-The oldest Windows lane installs/selects MSVC v141 (14.16) and SDK 18362
+The oldest Windows lane installs/selects MSVC v141 (14.16) and SDK 19041
 inside VS 2019. Do not let it silently use latest v142: CUDA 10.2's template
 expansion bug also affects Eigen, and retrying did not complete a real build.
 Check VCToolsVersion/WindowsSDKVersion before compiling; newer lanes stay unchanged.
+Verify SDK headers/import libraries on disk before activating MSVC. The VS 2019
+installation did not supply SDK 18362 despite returning success; use its recommended
+19041 component instead, and fail early if installation is incomplete.

@@ -109,10 +109,19 @@ jobs:
         if: runner.os == 'Windows' && (matrix.name == 'kepler30' || matrix.name == 'kepler')
         shell: pwsh
         env:
-          LEGACY_COMPONENTS: ${{ matrix.name == 'kepler30' && '--add Microsoft.VisualStudio.Component.VC.v141.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK.18362' || '' }}
+          LEGACY_COMPONENTS: ${{ matrix.name == 'kepler30' && '--add Microsoft.VisualStudio.Component.VC.v141.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK.19041' || '' }}
         run: |
           choco install visualstudio2019buildtools --yes --no-progress --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools $env:LEGACY_COMPONENTS --includeRecommended --quiet --norestart"
           if ($LASTEXITCODE -notin @(0,3010)) { exit $LASTEXITCODE }
+      - name: Verify legacy Windows SDK installation
+        if: runner.os == 'Windows' && matrix.name == 'kepler30'
+        shell: pwsh
+        run: |
+          # SDK 19041 is VS 2019's recommended SDK; retired 18362 may be skipped.
+          $sdk = "${env:ProgramFiles(x86)}\Windows Kits\10"
+          foreach ($file in @('include\10.0.19041.0\um\Windows.h', 'include\10.0.19041.0\ucrt\stdio.h', 'Lib\10.0.19041.0\um\x64\kernel32.lib')) {
+            if (-not (Test-Path (Join-Path $sdk $file))) { throw "Windows SDK 19041 installation incomplete: $file" }
+          }
       - name: Select MSVC toolchain
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
@@ -120,13 +129,13 @@ jobs:
           arch: x64
           vsversion: ${{ (matrix.name == 'kepler30' || matrix.name == 'kepler') && '2019' || '2022' }}
           toolset: ${{ matrix.name == 'kepler30' && '14.16' || '' }}
-          sdk: ${{ matrix.name == 'kepler30' && '10.0.18362.0' || '' }}
+          sdk: ${{ matrix.name == 'kepler30' && '10.0.19041.0' || '' }}
       - name: Verify CUDA 10.2 host compiler
         if: runner.os == 'Windows' && matrix.name == 'kepler30'
         shell: pwsh
         run: |
           if ($env:VCToolsVersion -notlike '14.16.*') { throw "CUDA 10.2 requires the selected v141 compiler, got $env:VCToolsVersion" }
-          if ($env:WindowsSDKVersion.TrimEnd('\') -ne '10.0.18362.0') { throw "Unexpected Windows SDK: $env:WindowsSDKVersion" }
+          if ($env:WindowsSDKVersion.TrimEnd('\') -ne '10.0.19041.0') { throw "Unexpected Windows SDK: $env:WindowsSDKVersion" }
           cl /Bv 2>&1 | Out-Host
           # cl without a source prints its version and exits nonzero.
           exit 0

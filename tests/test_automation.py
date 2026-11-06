@@ -222,9 +222,11 @@ class BuildCompatibilityTests(unittest.TestCase):
     def test_cuda102_windows_pins_supported_v141_toolset_and_period_sdk(self):
         workflow = (ROOT / ".github/workflows/build.yml").read_text()
         self.assertIn("Microsoft.VisualStudio.Component.VC.v141.x86.x64", workflow)
-        self.assertIn("Microsoft.VisualStudio.Component.Windows10SDK.18362", workflow)
+        self.assertIn("Microsoft.VisualStudio.Component.Windows10SDK.19041", workflow)
         self.assertIn("toolset: ${{ matrix.name == 'kepler30' && '14.16' || '' }}", workflow)
-        self.assertIn("sdk: ${{ matrix.name == 'kepler30' && '10.0.18362.0' || '' }}", workflow)
+        self.assertIn("sdk: ${{ matrix.name == 'kepler30' && '10.0.19041.0' || '' }}", workflow)
+        self.assertIn("Test-Path", workflow)
+        self.assertIn("include\\10.0.19041.0\\um\\Windows.h", workflow)
         self.assertIn("$env:VCToolsVersion -notlike '14.16.*'", workflow)
 
     def test_cuda102_thrust_retry_resumes_the_same_build_after_known_compiler_failure(self):
