@@ -72,3 +72,6 @@ the smoke report after changing cwd to work/ even though imports and ops pass.
 For Python >=3.9, setuptools must be >=70.1 for torchvision's direct
 setuptools.command.bdist_wheel import. Preserve the Kepler <=75.8.2 and modern
 <82 ceilings; an upper bound alone accepts hosted Windows' obsolete 65.5.
+Linux aarch64 builds set upstream's BUILD_IGNORE_SVE_UNAVAILABLE=1 to allow
+FindARM.cmake's non-SVE fallback when its optional SVE/BF16 compiler probe fails.
+Do not require SVE on the build host or change CUDA architecture selection.

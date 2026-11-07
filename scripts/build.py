@@ -187,6 +187,14 @@ def torch_version_environment(spec):
             "PYTORCH_VERSION_LT": major + "." + str(int(minor) + 1)}
 
 
+def cpu_build_environment():
+    # Upstream FindARM.cmake provides a baseline fallback when its SVE/BF16
+    # compiler probe fails. Hosted ARM builders need not provide optional SVE.
+    if sys.platform == "linux" and platform.machine() == "aarch64":
+        return {"BUILD_IGNORE_SVE_UNAVAILABLE": "1"}
+    return {}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", required=True)
@@ -202,6 +210,7 @@ def main():
     out.mkdir(exist_ok=True)
     cuda = Path(os.environ.get("CUDA_PATH", "/usr/local/cuda"))
     env = os.environ.copy()
+    env.update(cpu_build_environment())
     env.update({"CUDA_HOME": str(cuda), "CUDA_PATH": str(cuda),
                 # Also applies to pip's isolated PEP 517 build environment.
                 "PIP_PREFER_BINARY": "1",

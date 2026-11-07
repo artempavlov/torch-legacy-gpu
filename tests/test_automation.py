@@ -421,6 +421,17 @@ class BuildCompatibilityTests(unittest.TestCase):
     def test_modern_bootstrap_does_not_require_cffi_on_python313t(self):
         self.assertNotIn("cffi", self.bootstrap_command(13))
 
+    def test_linux_arm_build_can_fall_back_when_optional_sve_is_unavailable(self):
+        for system, machine in (("linux", "aarch64"), ("linux", "x86_64"), ("win32", "AMD64")):
+            with self.subTest(system=system, machine=machine), patch("build.sys.platform", system), patch("build.platform.machine", return_value=machine):
+                expected = {"BUILD_IGNORE_SVE_UNAVAILABLE": "1"} if machine == "aarch64" else {}
+                self.assertEqual(build.cpu_build_environment(), expected)
+
+    def test_bootstrap_applies_cpu_build_environment(self):
+        with patch("build.cpu_build_environment", return_value={}) as environment:
+            self.bootstrap_command(11, lane="volta")
+        environment.assert_called_once_with()
+
     def test_bootstrap_prefers_compatible_wheels_over_newer_sdists(self):
         self.assertIn("--prefer-binary", self.bootstrap_command(13))
 
