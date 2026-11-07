@@ -69,3 +69,6 @@ CUDA/bin; vendor that runtime, never exclude it as if it were a system driver.
 Anchor output paths to the absolute project root before resolve()/mkdir().
 Python 3.6/Windows can leave a missing relative path unchanged, which breaks
 the smoke report after changing cwd to work/ even though imports and ops pass.
+For Python >=3.9, setuptools must be >=70.1 for torchvision's direct
+setuptools.command.bdist_wheel import. Preserve the Kepler <=75.8.2 and modern
+<82 ceilings; an upper bound alone accepts hosted Windows' obsolete 65.5.

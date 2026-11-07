@@ -402,12 +402,12 @@ class BuildCompatibilityTests(unittest.TestCase):
         for call in run.call_args_list:
             self.assertEqual(call.args[:3], ("git", "-c", "core.longpaths=true"))
 
-    def bootstrap_command(self, minor, index=0):
+    def bootstrap_command(self, minor, index=0, lane="kepler"):
         (ROOT / ".tmp").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
             root = Path(directory)
             spec = root / "spec.json"
-            spec.write_text(json.dumps({"name": "kepler", "architectures": ["3.5", "3.7"],
+            spec.write_text(json.dumps({"name": lane, "architectures": ["3.5", "3.7"],
                                         "torch": "2.7.1", "vision": "0.22.1", "audio": "2.7.1", "local": "test"}))
             with patch("build.Path.cwd", return_value=root), patch("build.sys.argv", ["build.py", "--spec", str(spec), "--output", str(root / "dist")]), patch("build.sys.version_info", Mock(minor=minor)), patch("build.pip") as pip, patch("build.checkout", side_effect=RuntimeError("stop before compilation")), patch.dict(os.environ):
                 with self.assertRaisesRegex(RuntimeError, "stop before compilation"):
@@ -425,7 +425,13 @@ class BuildCompatibilityTests(unittest.TestCase):
         self.assertIn("--prefer-binary", self.bootstrap_command(13))
 
     def test_kepler_setuptools_respects_upstream_windows_limit(self):
-        self.assertIn("setuptools<=75.8.2", self.bootstrap_command(13))
+        self.assertIn("setuptools>=70.1,<=75.8.2", self.bootstrap_command(13))
+
+    def test_modern_bootstrap_upgrades_hosted_setuptools_to_provide_bdist_wheel(self):
+        command = self.bootstrap_command(13, lane="maxwell")
+        requirement = next(Requirement(a) for a in command if a.startswith("setuptools"))
+        self.assertNotIn("65.5.0", requirement.specifier)
+        self.assertIn("70.1.0", requirement.specifier)
 
     def test_cuda102_installer_has_libxml2_before_it_runs(self):
         script = (ROOT / "scripts/linux.sh").read_text()

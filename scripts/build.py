@@ -231,7 +231,9 @@ def main():
         # Newest sdists can drop an experimental ABI before older wheels do.
         # CFFI is only needed by the 1.6 lane and rejects CPython 3.13t entirely.
         # 2.7's requirements.txt explicitly caps setuptools on Windows.
-        setuptools = "setuptools<=75.8.2" if spec["name"] == "kepler" else "setuptools<82"
+        # torchvision imports setuptools.command.bdist_wheel (added in 70.1).
+        # An upper bound alone leaves hosted Windows' setuptools 65.5 in place.
+        setuptools = "setuptools>=70.1,<=75.8.2" if spec["name"] == "kepler" else "setuptools>=70.1,<82"
         pip("install", "--prefer-binary", setuptools, "wheel", "cmake>=3.27,<4", "ninja", "numpy<3", "pyyaml", "typing_extensions", "packaging", "six", "requests", "pillow", "filelock", "sympy", "networkx", "jinja2", "fsspec", "psutil", "astunparse", "optree>=0.13.0")
     if sys.platform == "win32":
         install_windows_repair_tool()
