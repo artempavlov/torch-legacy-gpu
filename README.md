@@ -21,8 +21,8 @@ Hosted runners have no NVIDIA GPU; the latter requires testing on your hardware.
 | maxwell | 5.0, 5.2 | 12.6 | New upstream releases | Linux/Windows x86_64 |
 | pascal | 6.0, 6.1 | 12.6 | New upstream releases | Linux/Windows x86_64 |
 | volta | 7.0 | 12.6 | New upstream releases | Linux/Windows x86_64; Linux ARM64 SBSA |
-| modern | 7.5, 8.0, 8.6, 8.9, 9.0, 10.0, 12.0 + PTX | 13.2 | New upstream releases | Linux/Windows x86_64 |
-| modern ARM | 8.0, 9.0, 10.0, 11.0, 12.0 + PTX | 13.2 | New upstream releases | Linux ARM64 SBSA |
+| modern75 / modern80 / modern86 / modern89 / modern90 / modern100 / modern120 | One target per lane: 7.5 / 8.0 / 8.6 / 8.9 / 9.0 / 10.0 / 12.0 + PTX | 13.2 | New upstream releases | Linux/Windows x86_64 |
+| modern80 / modern90 / modern100 / modern110 / modern120 | One target per lane: 8.0 / 9.0 / 10.0 / 11.0 / 12.0 + PTX | 13.2 | New upstream releases | Linux ARM64 SBSA |
 
 All CPython minors in the upstream release compatibility row are planned,
 including free-threaded Python from 3.13 where upstream lists support. Frozen
@@ -32,6 +32,13 @@ version constraints, **not** guessed from matching minor version numbers.
 Unversioned `torch` requirements are not accepted as compatibility evidence;
 the oldest unversioned packages use explicit historical pins (vision 0.7.0,
 audio 0.6.0 for torch 1.6.0).
+
+CUDA 13 wheels are split by compute capability: choose the `modernNN` lane
+matching your GPU, not a universal `modern` wheel. This retains all listed
+targets while limiting per-job compiler memory and time. Upstream may also
+compile architecture-specific variants (such as sm_90a) for selected kernels.
+These lanes replace the combined `modern` build recipe; already published
+historical lanes are unchanged.
 
 Kepler cannot be restored to modern CUDA by an architecture flag: CUDA 11
 removed sm_30, CUDA 12 removed sm_35/sm_37, and CUDA 13 removed compilation for
@@ -103,8 +110,9 @@ old audio 0.6 Linux extension still requires system SoX (bundled by repair);
 - Scheduled runs and pushes to build automation discover pending bundles.
   Manual dispatch accepts a stable `torch` version and/or exact `only` bundle ID.
   Download the `plan` artifact to find IDs and the full intended matrix.
-- Compilation uses at most two concurrent compiler processes. Architecture
-  families are separated to reduce memory and wheel size. Linux ccache is saved
+- Compilation uses one concurrent compiler process for CUDA 13, at most two
+  for older toolkits. CUDA 13 targets have separate wheels to reduce compiler
+  memory and wheel size. Linux ccache is saved
   even after a controlled timeout where possible; cache retention is not guaranteed.
 - Successful bundles upload three repaired wheels followed by a JSON commit
   marker to a draft release. Only a complete lane/platform/Python group is

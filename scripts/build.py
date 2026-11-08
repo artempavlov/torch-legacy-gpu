@@ -195,6 +195,13 @@ def cpu_build_environment():
     return {}
 
 
+def compiler_parallelism(spec):
+    jobs = str(spec.get("build_jobs", 2))
+    if jobs not in ("1", "2"):
+        raise ValueError("Hosted build_jobs must be 1 or 2")
+    return {"MAX_JOBS": jobs, "CMAKE_BUILD_PARALLEL_LEVEL": jobs}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", required=True)
@@ -211,11 +218,12 @@ def main():
     cuda = Path(os.environ.get("CUDA_PATH", "/usr/local/cuda"))
     env = os.environ.copy()
     env.update(cpu_build_environment())
+    env.update(compiler_parallelism(spec))
     env.update({"CUDA_HOME": str(cuda), "CUDA_PATH": str(cuda),
                 # Also applies to pip's isolated PEP 517 build environment.
                 "PIP_PREFER_BINARY": "1",
                 "TORCH_CUDA_ARCH_LIST": ";".join(spec["architectures"]),
-                "MAX_JOBS": "2", "CMAKE_BUILD_PARALLEL_LEVEL": "2", "CMAKE_GENERATOR": "Ninja",
+                "CMAKE_GENERATOR": "Ninja",
                 "USE_CUDA": "1", "FORCE_CUDA": "1", "BUILD_TEST": "0",
                 "USE_DISTRIBUTED": "0", "USE_NCCL": "0", "USE_CUDNN": "0",
                 "USE_FLASH_ATTENTION": "0", "USE_MEM_EFF_ATTENTION": "0",

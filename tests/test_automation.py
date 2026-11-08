@@ -137,6 +137,24 @@ class PlanningTests(unittest.TestCase):
                 self.assertNotIn(row["name"], ("kepler", "kepler30", "maxwell", "pascal"))
                 self.assertNotIn("5.3", row["architectures"])
 
+    def test_cuda13_splits_targets_without_losing_gpu_or_python_coverage(self):
+        rows = [r for r in self.rows() if r["cuda"].startswith("13.")]
+        fixture = json.loads((ROOT / "tests/fixtures.json").read_text())
+        pythons = set(python_versions(fixture["document"], "2.15.0"))
+        expected = {"linux-x86_64": {"7.5", "8.0", "8.6", "8.9", "9.0", "10.0", "12.0+PTX"},
+                    "windows-x86_64": {"7.5", "8.0", "8.6", "8.9", "9.0", "10.0", "12.0+PTX"},
+                    "linux-aarch64": {"8.0", "9.0", "10.0", "11.0", "12.0+PTX"}}
+        for row in rows:
+            self.assertEqual(len(row["architectures"]), 1)
+            self.assertEqual(row["build_jobs"], 1)
+        for platform, architectures in expected.items():
+            selected = [r for r in rows if r["platform"] == platform]
+            self.assertEqual({r["python"] for r in selected}, pythons)
+            for python in pythons:
+                targets = [r["architectures"][0] for r in selected if r["python"] == python]
+                self.assertEqual(set(targets), architectures)
+                self.assertEqual(len(targets), len(architectures))
+
     def test_revision_separates_immutable_releases(self):
         self.assertNotEqual(release_tag("2.15.0", "maxwell", 1), release_tag("2.15.0", "maxwell", 2))
 
@@ -431,6 +449,19 @@ class BuildCompatibilityTests(unittest.TestCase):
         with patch("build.cpu_build_environment", return_value={}) as environment:
             self.bootstrap_command(11, lane="volta")
         environment.assert_called_once_with()
+
+    def test_compiler_parallelism_respects_lane_memory_budget(self):
+        for jobs in (1, 2):
+            self.assertEqual(build.compiler_parallelism({"build_jobs": jobs}),
+                             {"MAX_JOBS": str(jobs), "CMAKE_BUILD_PARALLEL_LEVEL": str(jobs)})
+        self.assertEqual(build.compiler_parallelism({})["MAX_JOBS"], "2")
+        with self.assertRaises(ValueError):
+            build.compiler_parallelism({"build_jobs": 0})
+
+    def test_bootstrap_applies_lane_compiler_parallelism(self):
+        with patch("build.compiler_parallelism", return_value={}) as limits:
+            self.bootstrap_command(11, lane="modern80")
+        limits.assert_called_once()
 
     def test_bootstrap_prefers_compatible_wheels_over_newer_sdists(self):
         self.assertIn("--prefer-binary", self.bootstrap_command(13))

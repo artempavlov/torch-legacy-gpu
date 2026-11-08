@@ -79,3 +79,8 @@ Keep modern PEP 517 builds verbose: pip's default hides compiler progress until
 completion, preventing diagnosis when the hosted time budget expires. Smoke
 tests enable faulthandler and flush phase markers before imports/CPU operations
 so native crashes (including Windows access violations) identify the last phase.
+CUDA 13 uses one modernNN lane per base compute capability and build_jobs=1.
+Do not merge them back into a multi-architecture wheel: RowwiseScaledMM.cu's
+NVCC process was killed with code 137 on ARM, and combined x86 builds timed out.
+Preserve the union of targets/platforms and immutable older lane fingerprints.
+Upstream adds specialized variants (90a/100a/etc.); do not patch kernels away.

@@ -7,6 +7,13 @@
     {"name": "maxwell", "torch": "latest", "cuda": "12.6.3", "image": "12.6.3-devel-ubuntu22.04", "architectures": ["5.0", "5.2"], "platforms": ["linux-x86_64", "windows-x86_64"]},
     {"name": "pascal", "torch": "latest", "cuda": "12.6.3", "image": "12.6.3-devel-ubuntu22.04", "architectures": ["6.0", "6.1"], "platforms": ["linux-x86_64", "windows-x86_64"]},
     {"name": "volta", "torch": "latest", "cuda": "12.6.3", "image": "12.6.3-devel-ubuntu22.04", "architectures": ["7.0"], "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]},
-    {"name": "modern", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["7.5", "8.0", "8.6", "8.9", "9.0", "10.0", "12.0+PTX"], "arm_architectures": ["8.0", "9.0", "10.0", "11.0", "12.0+PTX"], "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]}
+    {"name": "modern75", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["7.5"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "modern80", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["8.0"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]},
+    {"name": "modern86", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["8.6"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "modern89", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["8.9"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64"]},
+    {"name": "modern90", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["9.0"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]},
+    {"name": "modern100", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["10.0"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]},
+    {"name": "modern110", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["11.0"], "build_jobs": 1, "platforms": ["linux-aarch64"]},
+    {"name": "modern120", "torch": "latest", "cuda": "13.2.0", "image": "13.2.0-devel-ubuntu24.04", "architectures": ["12.0+PTX"], "build_jobs": 1, "platforms": ["linux-x86_64", "windows-x86_64", "linux-aarch64"]}
   ]
 }
