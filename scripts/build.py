@@ -268,7 +268,9 @@ def main():
         project = source / "pyproject.toml"
         modern_backend = package == "torch" and project.exists() and "scikit_build_core.build" in project.read_text()
         if modern_backend:
-            pip("wheel", "--no-deps", "--wheel-dir", raw, source, env=env)
+            # Otherwise pip hides the compiler's progress until completion,
+            # leaving only "still running" if the hosted job times out.
+            pip("wheel", "--verbose", "--no-deps", "--wheel-dir", raw, source, env=env)
         else:
             legacy_windows = package == "torch" and spec["name"] == "kepler30" and sys.platform == "win32"
             build_command = run_cuda102_windows_build if legacy_windows else run

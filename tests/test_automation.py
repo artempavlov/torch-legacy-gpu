@@ -459,6 +459,37 @@ class BuildCompatibilityTests(unittest.TestCase):
         for name in ("build.py", "smoke.py"):
             ast.parse((ROOT / "scripts" / name).read_text(), feature_version=(3, 6))
 
+    def test_modern_torch_build_exposes_compiler_progress(self):
+        tree = ast.parse((ROOT / "scripts/build.py").read_text())
+        commands = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name) and node.func.id == "pip"
+                    and node.args and isinstance(node.args[0], ast.Constant)
+                    and node.args[0].value == "wheel"]
+        self.assertTrue(commands)
+        for command in commands:
+            self.assertIn("--verbose", [a.value for a in command.args if isinstance(a, ast.Constant)])
+
+    @unittest.skipUnless(sys.platform == "linux", "POSIX native-crash diagnostic probe")
+    def test_smoke_native_crash_records_phase_and_trace_without_a_report(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as directory:
+            root = Path(directory)
+            spec, report = root / "spec.json", root / "smoke.json"
+            spec.write_text("{}")
+            (root / "torch.py").write_text(
+                "import resource, ctypes\n"
+                "resource.setrlimit(resource.RLIMIT_CORE, (0, 0))\n"
+                "ctypes.string_at(0)\n")
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/smoke.py"),
+                                     "--spec", str(spec), "--report", str(report)],
+                                    cwd=root, env=dict(os.environ, PYTHONPATH=str(root)),
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("[smoke] import torch", result.stdout)
+            self.assertIn("Fatal Python error", result.stderr)
+            self.assertIn("torch.py", result.stderr)
+            self.assertFalse(report.exists())
+
     def test_sm30_patch_is_narrow_and_fails_closed(self):
         base = ROOT / ".tmp"
         base.mkdir(exist_ok=True)

@@ -75,3 +75,7 @@ setuptools.command.bdist_wheel import. Preserve the Kepler <=75.8.2 and modern
 Linux aarch64 builds set upstream's BUILD_IGNORE_SVE_UNAVAILABLE=1 to allow
 FindARM.cmake's non-SVE fallback when its optional SVE/BF16 compiler probe fails.
 Do not require SVE on the build host or change CUDA architecture selection.
+Keep modern PEP 517 builds verbose: pip's default hides compiler progress until
+completion, preventing diagnosis when the hosted time budget expires. Smoke
+tests enable faulthandler and flush phase markers before imports/CPU operations
+so native crashes (including Windows access violations) identify the last phase.
